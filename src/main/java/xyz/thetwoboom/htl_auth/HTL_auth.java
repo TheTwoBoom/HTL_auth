@@ -8,6 +8,7 @@ import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -16,6 +17,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.apache.http.client.fluent.Request;
 import org.apache.http.client.fluent.Form;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.UUID;
@@ -38,12 +40,15 @@ public class HTL_auth extends JavaPlugin implements Listener {
     private final String title = ChatColor.RED + "Verify dich mit /verify!";
     private final String subtitle = ChatColor.GRAY + "Exklusiv für Schüler der HTL Rennweg!";
 
+    private FileConfiguration playerDataConfig;
+    private File playerDataFile;
 
     @Override
     public void onEnable() {
         Bukkit.getServer().getPluginManager().registerEvents(this, this);
         saveDefaultConfig();
         loadConfigValues();
+        loadPlayerData();
         webServer = new OAuthWebServer(2500, this);
         try {
             webServer.start();
@@ -82,7 +87,9 @@ public class HTL_auth extends JavaPlugin implements Listener {
             webServer.stop();
             getLogger().info("OAuth Web-Server gestoppt.");
         }
+        savePlayerData();
     }
+
     @EventHandler
     public void onPlayerMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
@@ -94,6 +101,7 @@ public class HTL_auth extends JavaPlugin implements Listener {
             player.sendMessage(ChatColor.RED + "Verifiziere dich mit /verify, um den Server zu nutzen!");
         }
     }
+
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
@@ -112,6 +120,22 @@ public class HTL_auth extends JavaPlugin implements Listener {
         clientSecret = config.getString("oauth.client_secret");
         redirectUri = config.getString("oauth.redirect_uri");
         organizationDomain = config.getString("oauth.organization_domain");
+    }
+
+    private void loadPlayerData() {
+        playerDataFile = new File(getDataFolder(), "playerData.yml");
+        if (!playerDataFile.exists()) {
+            saveResource("playerData.yml", false);
+        }
+        playerDataConfig = YamlConfiguration.loadConfiguration(playerDataFile);
+    }
+
+    private void savePlayerData() {
+        try {
+            playerDataConfig.save(playerDataFile);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private String generateOAuthLink(UUID playerUUID) {
@@ -142,10 +166,15 @@ public class HTL_auth extends JavaPlugin implements Listener {
                             .build())
                     .execute().returnContent().asString();
 
-            // Hier musst du den Code parsen und überprüfen, ob die Domain stimmt.
             String email = extractEmailFromToken(response);
             if (email != null && email.endsWith("@" + organizationDomain)) {
-                assignRank(Bukkit.getPlayer(playerUUID));
+                // Check if the email is already tied to another UUID
+                if (isEmailLinkedToAnotherAccount(email, playerUUID)) {
+                    Bukkit.getPlayer(playerUUID).sendMessage(ChatColor.RED + "Diese E-Mail-Adresse ist bereits mit einem anderen Minecraft-Account verknüpft.");
+                } else {
+                    assignRank(Bukkit.getPlayer(playerUUID));
+                    linkEmailToPlayer(email, playerUUID); // Store the email-UUID link
+                }
             } else {
                 Bukkit.getPlayer(playerUUID).sendMessage("§cVerifizierung fehlgeschlagen. §rFalsche Organisation/Kein HTL Account");
             }
@@ -157,24 +186,18 @@ public class HTL_auth extends JavaPlugin implements Listener {
 
     private String extractEmailFromToken(String tokenResponse) {
         try {
-            // Das Token hat das Format: Header.Payload.Signature
             String[] tokenParts = tokenResponse.split("\\.");
             if (tokenParts.length < 2) {
                 throw new IllegalArgumentException("Ungültiges JWT-Token-Format.");
             }
 
-            // Der zweite Teil ist die Payload (Base64 kodiert)
             String payload = new String(Base64.getUrlDecoder().decode(tokenParts[1]));
-
-            // Verwende ObjectMapper, um die JSON-Payload in eine Map zu konvertieren
             ObjectMapper objectMapper = new ObjectMapper();
             Map<String, Object> payloadData = objectMapper.readValue(payload, Map.class);
 
-            // Extrahiere die E-Mail-Adresse aus der Payload
             if (payloadData.containsKey("email")) {
                 return (String) payloadData.get("email");
             } else if (payloadData.containsKey("upn")) {
-                // Fallback für die E-Mail in Azure-AD-Token, falls "email" nicht verfügbar ist.
                 return (String) payloadData.get("upn");
             } else {
                 throw new IllegalArgumentException("E-Mail-Feld nicht im Token vorhanden.");
@@ -186,11 +209,24 @@ public class HTL_auth extends JavaPlugin implements Listener {
         }
     }
 
+    private boolean isEmailLinkedToAnotherAccount(String email, UUID currentUUID) {
+        for (String uuid : playerDataConfig.getKeys(false)) {
+            String storedEmail = playerDataConfig.getString(uuid + ".email");
+            if (storedEmail != null && storedEmail.equalsIgnoreCase(email) && !uuid.equals(currentUUID.toString())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void linkEmailToPlayer(String email, UUID playerUUID) {
+        playerDataConfig.set(playerUUID.toString() + ".email", email);
+        savePlayerData();
+    }
+
     private void assignRank(Player player) {
         if (player != null) {
-            // Beispiel für Vault-Integration
             player.sendMessage("§aVerifizierung erfolgreich! §rJetzt kann es losgehen!");
-            // Hier würdest du den Rang tatsächlich setzen (z.B. mit Vault)
             Bukkit.getScheduler().runTask(this, () -> {
                 getServer().dispatchCommand(getServer().getConsoleSender(), "luckperms user " + player.getName() + " group add verified");
                 getServer().dispatchCommand(getServer().getConsoleSender(), "spawn " + player.getName());
@@ -200,4 +236,3 @@ public class HTL_auth extends JavaPlugin implements Listener {
         }
     }
 }
-
