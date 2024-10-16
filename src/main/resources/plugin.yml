@@ -1,0 +1,7 @@
+name: HTL_auth
+version: '${project.version}'
+main: xyz.thetwoboom.htl_auth.HTL_auth
+api-version: '1.21'
+commands:
+  verify:
+    description: "Verifiziere deinen Account"
