@@ -1,0 +1,17 @@
+name: HTL_auth
+version: '${project.version}'
+main: xyz.thetwoboom.htl_auth.HTL_auth
+description: 'Easy Authentication for Minecraft via Microsoft Entra ID'
+author: TheTwoBoom
+depend: [LuckPerms]
+website: 'https://github.com/TheTwoBoom/HTL_auth'
+api-version: '1.20.6'
+commands:
+  verify:
+    description: "Verify your account"
+    usage: "/verify"
+  lookup:
+    description: "Shows information about a player"
+    usage: "/lookup <Spieler>"
+    permission: "htlauth.lookup"
+folia-supported: true
