@@ -6,7 +6,6 @@ Easy Authentication for Minecraft via Microsoft Entra ID
 ![MIT License](https://img.shields.io/badge/License-MIT-green.svg)
 ![Made with Java](https://img.shields.io/badge/Made_with-Java-orange?style=flat&logo=openjdk)
 ![Made with Intellij IDEA](https://img.shields.io/badge/Made_with-IntelliJ_IDEA-red?style=flat&logo=intellij-idea)
-![Spigot 1.21.1](https://img.shields.io/badge/Spigot-1.21.1-blue?style=flat&logo=spigotmc)
 
 ## Setup
 Requires Microsoft App Registration via Microsoft Entra ID and Folia 1.20.6
