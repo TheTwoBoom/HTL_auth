@@ -14,4 +14,4 @@ Requires Microsoft App Registration via Microsoft Entra ID and Folia 1.20.6
   Move the downloaded `HTLAuth.jar` file into the `plugins` folder of your Minecraft Paper server directory.
   After uploading the plugin, restart your Minecraft server. The plugin will automatically load.
   After the first startup, a configuration file for HTLAuth will be generated in the `plugins/HTLAuth` folder.
-  Enter the details of your App in the config and restart the paper server
+  Enter the details of your Entra ID App in the config and restart the paper server
