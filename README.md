@@ -9,7 +9,7 @@ Easy Authentication for Minecraft via Microsoft Entra ID
 ![Spigot 1.21.1](https://img.shields.io/badge/Spigot-1.21.1-blue?style=flat&logo=spigotmc)
 
 ## Setup
-Requires Microsoft App Registration via Microsoft Entra ID and Paper 1.21.1
+Requires Microsoft App Registration via Microsoft Entra ID and Folia 1.20.6
 
   Download the latest version of the HTLAuth plugin from the [Releases page](https://github.com/TheTwoBoom/HTL_auth/releases).
   Move the downloaded `HTLAuth.jar` file into the `plugins` folder of your Minecraft Paper server directory.
