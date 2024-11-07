@@ -3,7 +3,7 @@
 Easy Authentication for Minecraft via Microsoft Entra ID
 
 
-![MIT License](https://img.shields.io/badge/License-MIT-green.svg)
+![MIT License](https://img.shields.io/badge/License-AGPL3-green.svg)
 ![Made with Java](https://img.shields.io/badge/Made_with-Java-orange?style=flat&logo=openjdk)
 ![Made with Intellij IDEA](https://img.shields.io/badge/Made_with-IntelliJ_IDEA-red?style=flat&logo=intellij-idea)
 
