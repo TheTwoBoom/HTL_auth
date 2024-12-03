@@ -7,14 +7,6 @@ Easy Authentication for Minecraft via Microsoft Entra ID
 ![Made with Java](https://img.shields.io/badge/Made_with-Java-orange?style=flat&logo=openjdk)
 ![Made with Intellij IDEA](https://img.shields.io/badge/Made_with-IntelliJ_IDEA-red?style=flat&logo=intellij-idea)
 
-It seems there was an issue retrieving the primary files in the repository. However, I have gathered the repository metadata. Here is a draft for the SpigotMC README for the HTL_auth plugin:
-
----
-
-# HTL_auth
-
-HTL_auth is a SpigotMC plugin that provides authentication functionalities for your Minecraft server.
-
 ## Features
 
 - Secure authentication for players via Microsoft OAuth
@@ -42,6 +34,9 @@ After the server restarts, a configuration file will be generated in the `plugin
 - `htlauth.join` - Allows players to move and take damage
 - `htlauth.lookup` - Allows players to lookup **email and full names** of other players (if enabled in config
 
+## Demo
+https://github.com/user-attachments/assets/6dcbb844-5c94-41cc-8e40-99b01fe4257d
+
 ## License
 
 This project is licensed under the GNU Affero General Public License v3.0. See the [LICENSE](https://github.com/TheTwoBoom/HTL_auth/blob/main/LICENSE) file for details.
@@ -53,9 +48,6 @@ Contributions are welcome! Please fork this repository and submit pull requests.
 ## Support
 
 For issues and feature requests, please use the [GitHub issues](https://github.com/TheTwoBoom/HTL_auth/issues) page.
-
-## Demo
-https://github.com/user-attachments/assets/6dcbb844-5c94-41cc-8e40-99b01fe4257d
 
 ## Disclaimer
 This project/product/service is not affiliated with, endorsed by, or associated with Microsoft Corporation in any way. Microsoft and its products or services mentioned here are trademarks or registered trademarks of Microsoft Corporation in the United States and/or other countries. All information provided is for informational purposes only and should not be interpreted as representing or reflecting the views or opinions of Microsoft Corporation.
