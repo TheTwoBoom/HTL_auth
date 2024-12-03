@@ -7,14 +7,52 @@ Easy Authentication for Minecraft via Microsoft Entra ID
 ![Made with Java](https://img.shields.io/badge/Made_with-Java-orange?style=flat&logo=openjdk)
 ![Made with Intellij IDEA](https://img.shields.io/badge/Made_with-IntelliJ_IDEA-red?style=flat&logo=intellij-idea)
 
-## Setup
+It seems there was an issue retrieving the primary files in the repository. However, I have gathered the repository metadata. Here is a draft for the SpigotMC README for the HTL_auth plugin:
+
+---
+
+# HTL_auth
+
+HTL_auth is a SpigotMC plugin that provides authentication functionalities for your Minecraft server.
+
+## Features
+
+- Secure authentication for players via Microsoft OAuth
+- Only allows certain e-mail domains to join
+- Perfect for School/Work Minecraft Servers
+
+## Installation
 Requires Microsoft App Registration via Microsoft Entra ID and Folia 1.20.6
 
-  Download the latest version of the HTLAuth plugin from the [Releases page](https://github.com/TheTwoBoom/HTL_auth/releases).
-  Move the downloaded `HTLAuth.jar` file into the `plugins` folder of your Minecraft Paper server directory.
-  After uploading the plugin, restart your Minecraft server. The plugin will automatically load.
-  After the first startup, a configuration file for HTLAuth will be generated in the `plugins/HTLAuth` folder.
-  Enter the details of your Entra ID App in the config and restart the paper server
+1. Download the latest version of the HTL_auth plugin from the [releases page](https://github.com/TheTwoBoom/HTL_auth/releases).
+2. Place the downloaded JAR file into your server's `plugins` directory.
+3. Restart your server to load the plugin.
+
+## Configuration
+
+After the server restarts, a configuration file will be generated in the `plugins/HTL_auth` directory. You can edit this file to customize the plugin settings.
+
+## Commands
+
+- `/auth <password>` - Authenticate with your password.
+- `/lookup <user>` - Register a new account with a password.
+
+## Permissions
+
+- `htlauth.join` - Allows players to move and take damage
+- `htlauth.lookup` - Allows players to lookup **email and full names** of other players (if enabled in config
+
+## License
+
+This project is licensed under the GNU Affero General Public License v3.0. See the [LICENSE](https://github.com/TheTwoBoom/HTL_auth/blob/main/LICENSE) file for details.
+
+## Contributing
+
+Contributions are welcome! Please fork this repository and submit pull requests.
+
+## Support
+
+For issues and feature requests, please use the [GitHub issues](https://github.com/TheTwoBoom/HTL_auth/issues) page.
 
 ## Demo
 https://github.com/user-attachments/assets/6dcbb844-5c94-41cc-8e40-99b01fe4257d
