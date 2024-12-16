@@ -32,7 +32,7 @@ After the server restarts, a configuration file will be generated in the `plugin
 ## Permissions
 
 - `htlauth.join` - Allows players to move and take damage
-- `htlauth.lookup` - Allows players to lookup **email and full names** of other players (if enabled in config
+- `htlauth.lookup` - Allows players to lookup **email and full names** of other players (if enabled in config)
 
 ## Demo
 https://github.com/user-attachments/assets/6dcbb844-5c94-41cc-8e40-99b01fe4257d
