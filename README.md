@@ -26,8 +26,8 @@ After the server restarts, a configuration file will be generated in the `plugin
 
 ## Commands
 
-- `/auth <password>` - Authenticate with your password.
-- `/lookup <user>` - Register a new account with a password.
+- `/verify` - Authenticate with your microsoft account
+- `/lookup <user>` - Lookup **email and full names** of other players (if enabled in config)
 
 ## Permissions
 
