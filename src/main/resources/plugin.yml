@@ -12,6 +12,10 @@ commands:
     usage: "/verify"
   lookup:
     description: "Shows information about a player"
-    usage: "/lookup <Spieler>"
+    usage: "/lookup <player>"
     permission: "htlauth.lookup"
+  htlauth:
+    description: "Main command for HTL_auth"
+    usage: "/htlauth <reload/help/forceverify/reverify>"
+    permission: "htlauth.help"
 folia-supported: true

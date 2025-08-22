@@ -29,23 +29,28 @@ import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.model.group.Group;
 import net.luckperms.api.model.user.User;
 import org.bukkit.*;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.apache.http.client.utils.URIBuilder;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.player.PlayerEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.apache.http.client.fluent.Request;
 import org.apache.http.client.fluent.Form;
 import net.kyori.adventure.translation.GlobalTranslator;
 import net.kyori.adventure.translation.TranslationRegistry;
 
+import java.sql.*;
 import java.time.Duration;
 import java.util.Locale;
 import net.kyori.adventure.text.event.ClickEvent;
@@ -65,31 +70,44 @@ import net.luckperms.api.node.Node;
 import org.jetbrains.annotations.NotNull;
 
 public class HTL_auth extends JavaPlugin implements Listener {
-
+    LuckPerms api;
     private final FileConfiguration config = getConfig();
     private final String clientId = config.getString("oauth.client_id");
     private final String clientSecret = config.getString("oauth.client_secret");
     private final String redirectUri = config.getString("oauth.redirect_uri");
     private final String organizationDomain = config.getString("oauth.organization_domain");
     private final Locale language = new Locale(Objects.requireNonNull(config.getString("language")));
-    private final boolean savePlayers = config.getBoolean("playerData.enabled");
-    private final boolean savePlayersName = config.getBoolean("playerData.saveName");
+    private final boolean playerData = config.getBoolean("playerData.enabled");
+    private final boolean playerDataName = config.getBoolean("playerData.saveName");
     private final int webPort = config.getInt("oauth.webPort");
     private OAuthWebServer webServer;
+    private final HTL_auth plugin = this;
 
     private FileConfiguration playerDataConfig;
-    private File playerDataFile;
     private final Logger logger = getLogger();
     private World overworld;
     private final Title title = Title.title(Component.translatable("verify.title").color(TextColor.color(55, 255, 55)), Component.translatable("verify.subtitle").color(TextColor.color(125,249,255)), Title.Times.times(Duration.ofSeconds(1), Duration.ofSeconds(3600), Duration.ofSeconds(3)));
 
     @Override
     public void onEnable() {
+        api = LuckPermsProvider.get();
         Bukkit.getServer().getPluginManager().registerEvents(this, this);
         overworld = Bukkit.getWorld("world");
-        loadPlayerData();
         getConfig().options().copyDefaults(true);
         saveConfig();
+        loadPlayerData();
+        if (checkPermsGroup() == null) {
+            logger.warning("The group 'verified' does not exist in LuckPerms.");
+            logger.info("HTLAuth uses the group 'verified' to assign permissions to verified players.");
+            logger.warning("Creating the group 'verified' with minimal required permissions.");
+            createPermsGroup();
+        } else if (Boolean.FALSE.equals(checkPermsGroup())) {
+            logger.warning("The group 'verified' does not have the required permissions.");
+            logger.info("HTLAuth uses the group 'verified' to assign permissions to verified players.");
+            logger.warning("Please add the required permissions to the group 'verified' and restart the server.");
+            Bukkit.getPluginManager().disablePlugin(this);
+            return;
+        }
         TranslationRegistry registry = TranslationRegistry.create(Key.key("htl_auth", "translations"));
         ResourceBundle bundle = ResourceBundle.getBundle("translations", language, new UTF8ResourceBundleControl());
         registry.registerAll(language, bundle, true);
@@ -99,6 +117,12 @@ public class HTL_auth extends JavaPlugin implements Listener {
             if (webPort == 0) {
                 logger.severe("Webserver Port is not set in the config.");
                 logger.severe("Please set the port in the config and restart the server.");
+                Bukkit.getPluginManager().disablePlugin(this);
+                return;
+            }
+            if (clientId == null || clientSecret == null || redirectUri == null || organizationDomain == null) {
+                logger.severe("OAuth credentials are not set in the config.");
+                logger.severe("Please set the credentials in the config and restart the server.");
                 Bukkit.getPluginManager().disablePlugin(this);
                 return;
             }
@@ -121,6 +145,7 @@ public class HTL_auth extends JavaPlugin implements Listener {
                 String authLink = generateOAuthLink(player.getUniqueId());
 
                 if (authLink != null) {
+                    player.sendMessage(Component.translatable("verify.warning").color(TextColor.color(255, 225, 20)));
                     player.sendMessage(Component.translatable("verify.link", Component.text(authLink.substring(0, 50) + "...").clickEvent(ClickEvent.openUrl(authLink))).color(TextColor.color(170, 170, 170)));
                     logger.finer("Player " + player.getName() + " has requested verification.");
                 } else {
@@ -131,33 +156,65 @@ public class HTL_auth extends JavaPlugin implements Listener {
             }
         }
         if (command.getName().equalsIgnoreCase("lookup")) {
-            if (sender instanceof Player) {
-                Player player = (Player) sender;
-                if (!savePlayers) {
-                    player.sendMessage(Component.translatable("lookup.disabled").color(TextColor.color(255, 85, 85)));
-                    return true;
-                }
-                if (args.length == 1) {
-                    String username = args[0].toLowerCase();
-                    Player target = Bukkit.getPlayer(username);
-                    if (target != null) {
-                        Map<String, String> playerInfo = getPlayerInfo(target.getUniqueId());
-                        if (playerInfo == null) {
-                            player.sendMessage(Component.translatable("lookup.error", Component.text(target.getName())).color(TextColor.color(255, 85, 85)));
-                        } else if (playerInfo.isEmpty()) {
-                            player.sendMessage(Component.translatable("lookup.notfound", Component.text(target.getName())).color(TextColor.color(255, 85, 85)));
-                        } else {
-                            player.sendMessage(Component.translatable("lookup.info", Component.text(target.getName()).color(TextColor.color(85, 255, 255))));
-                            playerInfo.forEach((key, value) -> player.sendMessage("§a" + key + ": §r" + value));
-                        }
-                    } else {
-                        player.sendMessage(Component.translatable("lookup.notfound", Component.text(username)).color(TextColor.color(255, 85, 85)));
-                    }
-                } else {
-                    player.sendMessage(Component.translatable("lookup.usage").color(TextColor.color(85, 255, 255)));
-                }
+            if (!playerData) {
+                sender.sendMessage(Component.translatable("lookup.disabled").color(TextColor.color(255, 85, 85)));
                 return true;
             }
+            if (args.length == 1) {
+                String username = args[0].toLowerCase();
+                Player target = Bukkit.getPlayer(username);
+                if (target != null) {
+                    Map<String, String> playerInfo = getPlayerInfo(target.getUniqueId());
+                    if (playerInfo == null) {
+                        sender.sendMessage(Component.translatable("lookup.error", Component.text(target.getName())).color(TextColor.color(255, 85, 85)));
+                    } else if (playerInfo.isEmpty()) {
+                        sender.sendMessage(Component.translatable("lookup.notfound", Component.text(target.getName())).color(TextColor.color(255, 85, 85)));
+                    } else {
+                        sender.sendMessage(Component.translatable("lookup.info", Component.text(target.getName()).color(TextColor.color(85, 255, 255))));
+                        playerInfo.forEach((key, value) -> sender.sendMessage("§a" + key + ": §r" + value));
+                    }
+                } else {
+                    sender.sendMessage(Component.translatable("lookup.notfound", Component.text(username)).color(TextColor.color(255, 85, 85)));
+                }
+            } else {
+                sender.sendMessage(Component.translatable("lookup.usage").color(TextColor.color(85, 255, 255)));
+            }
+            return true;
+        }
+        if (command.getName().equalsIgnoreCase("htlauth")) {
+            if (args.length >= 1) {
+                if (args[0].equalsIgnoreCase("reload")) {
+                    reloadConfig();
+                    sender.sendMessage(Component.translatable("htlauth.reload").color(TextColor.color(85, 255, 85)));
+                    return true;
+                }
+                if (args[0].equalsIgnoreCase("forceverify")) {
+                    if (args.length == 2) {
+                        Player player = Bukkit.getPlayer(args[1]);
+                        assert player != null;
+                        assignRank(player);
+                        player.sendMessage(Component.translatable("verify.forceverify").color(TextColor.color(85, 255, 85)));
+                        sender.sendMessage(Component.translatable("htlauth.success", Component.text("/forceverify")).color(TextColor.color(85, 255, 85)));
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+                if (args[0].equalsIgnoreCase("reverify")) {
+                    if (args.length == 2) {
+                        Player player = Bukkit.getPlayer(args[1]);
+                        assert player != null;
+                        api.getUserManager().modifyUser(player.getUniqueId(), u -> u.data().remove(Node.builder("group.verified").build()));
+                        player.kick(Component.translatable("verify.reverify").color(TextColor.color(85, 255, 85)));
+                        sender.sendMessage(Component.translatable("htlauth.success", Component.text("/reverify")).color(TextColor.color(85, 255, 85)));
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+            }
+            sender.sendMessage(Component.translatable("htlauth.wip").color(TextColor.color(85, 255, 255)));
+            return true;
         }
         return false;
     }
@@ -176,17 +233,8 @@ public class HTL_auth extends JavaPlugin implements Listener {
         Player player = event.getPlayer();
         if (!player.hasPermission("htlauth.join")) {
             event.setCancelled(true);
+            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BIT, 10, 29);
             player.sendMessage(Component.translatable("verify.message").color(TextColor.color(255, 85, 85)));
-        }
-    }
-
-    @EventHandler
-    public void onEntityDamage(EntityDamageEvent event) {
-        if (event.getEntity() instanceof Player) {
-            Player player = (Player) event.getEntity();
-            if (!player.hasPermission("htlauth.join")) {
-                event.setCancelled(true);
-            }
         }
     }
 
@@ -194,32 +242,85 @@ public class HTL_auth extends JavaPlugin implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         if (!player.hasPermission("htlauth.join")) {
-            Random random = new Random();
-            int PlayerY = random.nextInt(256);
-            int PlayerX = random.nextInt(256);
             player.showTitle(title);
-            player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, Integer.MAX_VALUE, 1));
+            player.setGameMode(GameMode.SPECTATOR);
+            player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, Integer.MAX_VALUE, 255));
             player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BIT, 10, 29);
             player.sendMessage(Component.translatable("verify.message").color(TextColor.color(255, 85, 85)));
-            Location location = new Location(overworld, PlayerX, 199, PlayerY);
-            Bukkit.getRegionScheduler().run(this, location, task -> location.getBlock().setType(Material.BARRIER));
-            player.teleportAsync(new Location(overworld, PlayerX, 200, PlayerY));
+            player.teleportAsync(overworld.getSpawnLocation());
         }
     }
 
-    private void loadPlayerData() {
-        playerDataFile = new File(getDataFolder(), "playerData.yml");
-        if (!playerDataFile.exists()) {
-            saveResource("playerData.yml", false);
+    public void createPlayerData() {
+        String url = "jdbc:sqlite:" + plugin.getDataFolder().getAbsolutePath() + "/playerData.db";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            if (conn != null) {
+                DatabaseMetaData meta = conn.getMetaData();
+                logger.info("The driver name is " + meta.getDriverName());
+                logger.info("A new database has been created.");
+
+                String createTableSQL = "CREATE TABLE IF NOT EXISTS player_data ("
+                        + "uuid TEXT PRIMARY KEY,"
+                        + "email TEXT NOT NULL,"
+                        + "name TEXT"
+                        + ");";
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute(createTableSQL);
+                }
+            }
+        } catch (SQLException e) {
+            logger.severe("Error while creating player data: " + e.getMessage());
+            throw new RuntimeException(e);
         }
-        playerDataConfig = YamlConfiguration.loadConfiguration(playerDataFile);
     }
 
-    private void savePlayerData() {
-        try {
-            playerDataConfig.save(playerDataFile);
-        } catch (IOException e) {
-            logger.severe("Error while saving player data" + e.getMessage());
+    public void loadPlayerData() {
+        String url = "jdbc:sqlite:" + plugin.getDataFolder().getAbsolutePath() + "/playerData.db";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            if (conn != null) {
+                String selectSQL = "SELECT * FROM player_data";
+                try (Statement stmt = conn.createStatement()) {
+                    ResultSet rs = stmt.executeQuery(selectSQL);
+                    playerDataConfig = new YamlConfiguration();
+                    while (rs.next()) {
+                        String uuid = rs.getString("uuid");
+                        String email = rs.getString("email");
+                        String name = rs.getString("name");
+                        playerDataConfig.set(uuid + ".email", email);
+                        playerDataConfig.set(uuid + ".name", name);
+                    }
+                } catch (SQLException e) {
+                    logger.warning("Error while loading player data: " + e.getMessage());
+                    logger.warning("Creating new player data file.");
+                    createPlayerData();
+                    loadPlayerData();
+                }
+            }
+        } catch (SQLException e) {
+            logger.severe("Error while loading player data: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void savePlayerData() {
+        String url = "jdbc:sqlite:" + plugin.getDataFolder().getAbsolutePath() + "/playerData.db";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            if (conn != null) {
+                String insertSQL = "INSERT OR REPLACE INTO player_data(uuid, email, name) VALUES(?, ?, ?)";
+                try (PreparedStatement pstmt = conn.prepareStatement(insertSQL)) {
+                    for (String uuid : playerDataConfig.getKeys(false)) {
+                        String email = playerDataConfig.getString(uuid + ".email");
+                        String name = playerDataConfig.getString(uuid + ".name");
+                        pstmt.setString(1, uuid);
+                        pstmt.setString(2, email);
+                        pstmt.setString(3, name);
+                        pstmt.addBatch();
+                    }
+                    pstmt.executeBatch();
+                }
+            }
+        } catch (SQLException e) {
+            logger.severe("Error while saving player data: " + e.getMessage());
         }
     }
 
@@ -258,7 +359,7 @@ public class HTL_auth extends JavaPlugin implements Listener {
                     String fullName = userInfo.get("name");
 
                     if (email != null && email.endsWith("@" + organizationDomain)) {
-                        if (savePlayers) {
+                        if (playerData) {
                             if (isEmailLinkedToAnotherAccount(email, playerUUID)) {
                                 player.sendMessage(Component.translatable("verify.email.linked").color(TextColor.color(255, 85, 85)));
                                 logger.info("Player" + player.getName() + " tried to verify with an email that is already linked to another account.");
@@ -267,6 +368,7 @@ public class HTL_auth extends JavaPlugin implements Listener {
                             linkEmailToPlayer(email, fullName, playerUUID);
                         }
                         assignRank(Bukkit.getPlayer(playerUUID));
+                        player.sendMessage(Component.translatable("verify.success").color(TextColor.color(85, 255, 85)));
                     } else if (email != null) {
                         player.sendMessage(Component.translatable("verify.email.error").color(TextColor.color(255, 85, 85)));
                         logger.warning("Player " + player.getName() + " tried to verify with an email that is not from the organization domain.");
@@ -308,7 +410,7 @@ public class HTL_auth extends JavaPlugin implements Listener {
             }
             Map<String, String> userInfo = new HashMap<>();
             userInfo.put("email", email);
-            if (savePlayersName) {
+            if (playerDataName) {
                 if (payloadData.containsKey("name")) {
                     fullName = (String) payloadData.get("name");
                 }
@@ -326,16 +428,16 @@ public class HTL_auth extends JavaPlugin implements Listener {
     }
 
     private void linkEmailToPlayer(String email, String fullName, UUID playerUUID) {
-        if (!savePlayers) return;
+        if (!playerData) return;
         playerDataConfig.set(playerUUID.toString() + ".email", email);
-        if (fullName != null && savePlayersName) {
+        if (fullName != null && playerDataName) {
             playerDataConfig.set(playerUUID + ".name", fullName);
         }
         savePlayerData();
     }
 
     private boolean isEmailLinkedToAnotherAccount(String email, UUID currentUUID) {
-        if (!savePlayers) return false;
+        if (!playerData) return false;
         for (String uuid : playerDataConfig.getKeys(false)) {
             String storedEmail = playerDataConfig.getString(uuid + ".email");
             if (storedEmail != null && storedEmail.equalsIgnoreCase(email) && !uuid.equals(currentUUID.toString())) {
@@ -349,22 +451,18 @@ public class HTL_auth extends JavaPlugin implements Listener {
         Map<String, String> playerInfo = new HashMap<>();
         String email = playerDataConfig.getString(playerUUID.toString() + ".email");
         String name = playerDataConfig.getString(playerUUID + ".name");
-
         if (email != null) {
             playerInfo.put("email", email);
         }
-        if (!savePlayers || !savePlayersName) return playerInfo;
+        if (!playerData) return playerInfo;
         if (name != null) {
             playerInfo.put("name", name);
         }
-
         return playerInfo;
     }
 
     private void assignRank(Player player) {
-        LuckPerms api = LuckPermsProvider.get();
         if (player != null) {
-            player.sendMessage(Component.translatable("verify.success").color(TextColor.color(85, 255, 85)));
             User user = api.getUserManager().getUser(player.getUniqueId());
             if (user != null) {
                 Group group = api.getGroupManager().getGroup("verified");
@@ -372,10 +470,26 @@ public class HTL_auth extends JavaPlugin implements Listener {
                     api.getUserManager().modifyUser(user.getUniqueId(), u -> u.data().add(Node.builder("group.verified").build()));
                     Bukkit.getGlobalRegionScheduler().run(this, scheduledTask -> player.removePotionEffect(PotionEffectType.BLINDNESS));
                     player.resetTitle();
+                    player.teleportAsync(player.getWorld().getSpawnLocation());
+                    player.setGameMode(GameMode.SURVIVAL);
+                    logger.fine("Player " + player.getName() + " has been verified.");
                 }
             }
-            player.teleportAsync(player.getWorld().getSpawnLocation());
-            logger.fine("Player " + player.getName() + " has been verified.");
         }
+    }
+
+    private Boolean checkPermsGroup() {
+        Group defaultGroup = api.getGroupManager().getGroup("default");
+        Group verifiedGroup = api.getGroupManager().getGroup("verified");
+        if (defaultGroup != null && verifiedGroup != null) {
+            return verifiedGroup.getNodes().contains(Node.builder("htlauth.join").build());
+        }
+        return null;
+    }
+
+    private void createPermsGroup() {
+        api.getGroupManager().createAndLoadGroup("verified");
+        api.getGroupManager().modifyGroup("verified", verifiedGroup -> verifiedGroup.data().add(Node.builder("htlauth.join").build()));
+        api.getGroupManager().modifyGroup("default", defaultGroup -> defaultGroup.data().add(Node.builder("*").value(false).build()));
     }
 }
