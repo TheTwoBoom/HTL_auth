@@ -1,4 +1,7 @@
 language: "en" # The language to use for the plugin
+reminderMode: "AGGRESSIVE" # The reminder mode to use (options: OFF, DIALOG [1.21.7+], AGGRESSIVE)
+orgName: "Your Organization Name" # The name of the organization to display in messages
+contactMethodDialog: "Discord" # The method of contact to display in the dialog (e.g., "Discord", "Email")
 playerData:
   enabled: true # Whether to save player data to the database
   saveName: false # Whether to save the player's name to the database.

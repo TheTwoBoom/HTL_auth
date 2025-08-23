@@ -5,7 +5,7 @@ description: 'Easy Authentication for Minecraft via Microsoft Entra ID'
 author: TheTwoBoom
 depend: [LuckPerms]
 website: 'https://github.com/TheTwoBoom/HTL_auth'
-api-version: '1.20.6'
+api-version: '1.21.8'
 commands:
   verify:
     description: "Verify your account"
@@ -17,5 +17,5 @@ commands:
   htlauth:
     description: "Main command for HTL_auth"
     usage: "/htlauth <reload/help/forceverify/reverify>"
-    permission: "htlauth.help"
+    permission: "htlauth.admin"
 folia-supported: true
